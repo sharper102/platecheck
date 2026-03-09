@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>PlateCheck UK</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface2: #1a1a26;
+      --border: #2a2a3d;
+      --accent: #f0c040;
+      --accent2: #e05a20;
+      --green: #22c55e;
+      --red: #ef4444;
+      --amber: #f59e0b;
+      --text: #f0f0f8;
+      --muted: #7070a0;
+      --plate-yellow: #f5d000;
+      --plate-font: 'Charles Wright', 'Arial Black', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* HEADER */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 12px;
+      background: linear-gradient(180deg, #0f0f18 0%, transparent 100%);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-plate {
+      background: var(--plate-yellow);
+      color: #000;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 2px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 2px solid #000;
+      position: relative;
+    }
+
+    .logo-plate::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 10px;
+      background: #003399;
+      border-radius: 2px 0 0 2px;
+    }
+
+    .logo-plate span {
+      margin-left: 8px;
+    }
+
+    .logo-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: 1px;
+      color: var(--text);
+    }
+
+    .logo-title em {
+      color: var(--accent);
+      font-style: normal;
+    }
+
+    /* TABS */
+    .tabs {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+    }
+
+    .tab {
+      padding: 12px 16px;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* MAIN CONTENT */
+    main {
+      padding: 20px;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    /* CAMERA PANEL */
+    .camera-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .camera-viewport {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: #000;
+      overflow: hidden;
+    }
+
+    #videoEl {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    #captureCanvas {
+      display: none;
+    }
+
+    .camera-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .plate-frame {
+      width: 75%;
+      height: 38%;
+      border: 2px solid var(--accent);
+      border-radius: 6px;
+      position: relative;
+      box-shadow: 0 0 0 2000px rgba(0,0,0,0.35);
+    }
+
+    .plate-frame::before,
+    .plate-frame::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-color: var(--accent);
+      border-style: solid;
+    }
+
+    .plate-frame::before {
+      top: -2px; left: -2px;
+      border-width: 3px 0 0 3px;
+      border-radius: 4px 0 0 0;
+    }
+
+    .plate-frame::after {
+      bottom: -2px; right: -2px;
+      border-width: 0 3px 3px 0;
+      border-radius: 0 0 4px 0;
+    }
+
+    .scan-line {
+      position: absolute;
+      left: -2px; right: -2px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      animation: scanMove 2s ease-in-out infinite;
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    @keyframes scanMove {
+      0% { top: 0; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { top: calc(100% - 2px); opacity: 0; }
+    }
+
+    .frame-label {
+      position: absolute;
+      bottom: -26px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .camera-placeholder {
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: linear-gradient(135deg, #0f0f18 0%, #1a1a2e 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--muted);
+    }
+
+    .camera-placeholder svg {
+      opacity: 0.4;
+    }
+
+    .camera-placeholder p {
+      font-size: 14px;
+    }
+
+    /* CAMERA CONTROLS */
+    .camera-controls {
+      padding: 16px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      border: none;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.18s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn:active { transform: scale(0.96); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+      flex: 1;
+    }
+
+    .btn-primary:hover { background: #f5d050; }
+    .btn-primary:disabled { background: #5a5020; color: #888; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-danger {
+      background: #2a1a1a;
+      color: var(--red);
+      border: 1px solid #3d2222;
+    }
+
+    /* MANUAL INPUT */
+    .manual-input-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .section-label {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .plate-input-wrap {
+      display: flex;
+      gap: 10px;
+    }
+
+    .plate-input {
+      flex: 1;
+      background: var(--plate-yellow);
+      color: #000;
+      border: 3px solid #000;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 24px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      text-align: center;
+      outline: none;
+      transition: box-shadow 0.2s;
+    }
+
+    .plate-input::placeholder {
+      color: rgba(0,0,0,0.3);
+      letter-spacing: 2px;
+    }
+
+    .plate-input:focus {
+      box-shadow: 0 0 0 3px var(--accent), 0 0 20px rgba(240,192,64,0.3);
+    }
+
+    /* API KEY INPUT */
+    .api-key-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .api-key-input {
+      width: 100%;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+      letter-spacing: 1px;
+    }
+
+    .api-key-input:focus {
+      border-color: var(--accent);
+    }
+
+    .api-key-hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .api-key-hint a {
+      color: var(--accent);
+    }
+
+    /* STATUS BAR */
+    .status-bar {
+      padding: 12px 16px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      border: 1px solid;
+    }
+
+    .status-bar.info {
+      background: #0f1a2e;
+      border-color: #1a3060;
+      color: #88aaee;
+    }
+
+    .status-bar.success {
+      background: #0a1f0e;
+      border-color: #164d26;
+      color: #4ade80;
+    }
+
+    .status-bar.error {
+      background: #1f0a0a;
+      border-color: #4d1616;
+      color: #f87171;
+    }
+
+    .status-bar.warning {
+      background: #1f180a;
+      border-color: #4d3c16;
+      color: #fbbf24;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* RESULT CARD */
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .result-header {
+      background: linear-gradient(135deg, #1a1a26 0%, #12121e 100%);
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .result-plate {
+      background: var(--plate-yellow);
+      color: #000;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 28px;
+      letter-spacing: 5px;
+      padding: 10px 20px;
+      border-radius: 6px;
+      border: 3px solid #000;
+      position: relative;
+    }
+
+    .result-plate::before {
+      content: '🇬🇧';
+      position: absolute;
+      left: -18px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+    }
+
+    .result-make {
+      text-align: right;
+    }
+
+    .result-make-name {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: var(--text);
+    }
+
+    .result-year {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* STATUS BADGES */
+    .status-badges {
+      display: flex;
+      gap: 10px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      flex: 1;
+      min-width: 100px;
+      padding: 12px;
+      border-radius: 10px;
+      text-align: center;
+      border: 1px solid;
+    }
+
+    .badge-label {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      opacity: 0.7;
+    }
+
+    .badge-value {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .badge.valid {
+      background: #0a1f0e;
+      border-color: #22c55e;
+      color: #22c55e;
+    }
+
+    .badge.invalid {
+      background: #1f0a0a;
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+
+    .badge.unknown {
+      background: #1a1a26;
+      border-color: var(--border);
+      color: var(--muted);
+    }
+
+    .badge.warning {
+      background: #1f180a;
+      border-color: #f59e0b;
+      color: #f59e0b;
+    }
+
+    /* DETAIL GRID */
+    .detail-grid {
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .detail-item {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .detail-item.full {
+      grid-column: 1 / -1;
+    }
+
+    .detail-key {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .detail-val {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--text);
+    }
+
+    /* HISTORY TAB */
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .history-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .history-item:active {
+      background: var(--surface2);
+    }
+
+    .history-plate-mini {
+      background: var(--plate-yellow);
+      color: #000;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 2px;
+      padding: 5px 10px;
+      border-radius: 4px;
+      border: 2px solid #000;
+      white-space: nowrap;
+    }
+
+    .history-info {
+      flex: 1;
+    }
+
+    .history-make {
+      font-weight: 500;
+      font-size: 15px;
+    }
+
+    .history-meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .history-badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 600;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+
+    .empty-state svg {
+      opacity: 0.2;
+      margin-bottom: 16px;
+    }
+
+    .empty-state p {
+      font-size: 14px;
+    }
+
+    /* TOAST */
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #2a2a3d;
+      color: var(--text);
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      z-index: 1000;
+      border: 1px solid var(--border);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      white-space: nowrap;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* SECTION DIVIDER */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 16px 0;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 2px;
+    }
+
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* HIDDEN */
+    .hidden { display: none !important; }
+
+    /* CAPTURED IMAGE PREVIEW */
+    .preview-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    #previewImg {
+      width: 100%;
+      display: block;
+    }
+
+    .preview-controls {
+      padding: 14px 16px;
+      display: flex;
+      gap: 10px;
+    }
+
+    /* PROGRESS BAR */
+    .ocr-progress {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+
+    .progress-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .progress-track {
+      background: var(--surface2);
+      border-radius: 100px;
+      height: 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      border-radius: 100px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+
+    /* RESPONSIVE TWEAKS */
+    @media (max-width: 380px) {
+      .result-plate { font-size: 22px; letter-spacing: 3px; }
+      .detail-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-plate"><span>UK</span></div>
+    <div class="logo-title">Plate<em>Check</em></div>
+  </div>
+  <button class="btn btn-secondary" style="padding: 8px 12px; font-size: 12px;" onclick="clearHistory()">Clear History</button>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('scan')">📷 Scan</div>
+  <div class="tab" onclick="switchTab('manual')">⌨️ Manual</div>
+  <div class="tab" onclick="switchTab('history')">📋 History</div>
+  <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
+</div>
+
+<main>
+  <!-- ========== SCAN TAB ========== -->
+  <div id="tab-scan">
+    <!-- Camera viewport -->
+    <div class="camera-panel">
+      <div id="cameraLive" class="camera-viewport hidden">
+        <video id="videoEl" playsinline autoplay muted></video>
+        <canvas id="captureCanvas"></canvas>
+        <div class="camera-overlay">
+          <div class="plate-frame">
+            <div class="scan-line"></div>
+            <div class="frame-label">ALIGN NUMBER PLATE</div>
+          </div>
+        </div>
+      </div>
+      <div id="cameraPlaceholder" class="camera-placeholder">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        <p>Tap Start Camera to begin scanning</p>
+      </div>
+      <div class="camera-controls">
+        <button class="btn btn-primary" id="btnCamera" onclick="toggleCamera()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Start Camera
+        </button>
+        <button class="btn btn-secondary" id="btnCapture" onclick="captureFrame()" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+        </button>
+        <button class="btn btn-secondary" onclick="uploadImage()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
+        <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileUpload(event)" />
+      </div>
+    </div>
+
+    <!-- Preview + OCR -->
+    <div id="previewSection" class="preview-section hidden">
+      <img id="previewImg" alt="Captured" />
+      <div class="preview-controls">
+        <button class="btn btn-primary" onclick="runOCR()" id="btnOCR">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10"/></svg>
+          Scan Plate
+        </button>
+        <button class="btn btn-secondary" onclick="discardCapture()">Discard</button>
+      </div>
+    </div>
+
+    <!-- OCR Progress -->
+    <div id="ocrProgress" class="ocr-progress hidden">
+      <div class="progress-label">
+        <span id="ocrStatusText">Initialising OCR...</span>
+        <span id="ocrPct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div id="statusBar" class="hidden"></div>
+
+    <!-- Result -->
+    <div id="resultCard" class="hidden"></div>
+  </div>
+
+  <!-- ========== MANUAL TAB ========== -->
+  <div id="tab-manual" class="hidden">
+    <div class="manual-input-section">
+      <div class="section-label">Enter Registration</div>
+      <div class="plate-input-wrap">
+        <input
+          type="text"
+          class="plate-input"
+          id="manualInput"
+          placeholder="AB12 CDE"
+          maxlength="8"
+          oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9 ]/g, '')"
+          onkeydown="if(event.key==='Enter') lookupManual()"
+        />
+        <button class="btn btn-primary" onclick="lookupManual()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="statusBarManual" class="hidden"></div>
+    <div id="resultCardManual" class="hidden"></div>
+  </div>
+
+  <!-- ========== HISTORY TAB ========== -->
+  <div id="tab-history" class="hidden">
+    <div id="historyList"></div>
+  </div>
+
+  <!-- ========== SETTINGS TAB ========== -->
+  <div id="tab-settings" class="hidden">
+    <div class="api-key-section">
+      <div class="section-label">DVLA API Key</div>
+      <input
+        type="password"
+        class="api-key-input"
+        id="apiKeyInput"
+        placeholder="Enter your DVLA API key..."
+        oninput="saveApiKey()"
+      />
+      <p class="api-key-hint">
+        Get your <strong>free</strong> API key from the official DVLA developer portal:<br/>
+        <a href="https://developer-portal.driver-vehicle-licensing.api.gov.uk" target="_blank">developer-portal.driver-vehicle-licensing.api.gov.uk</a>
+        <br/><br/>
+        Click <strong>Apply</strong> on the Vehicle Enquiry Service page. It's free for up to ~6,000 requests/day.
+      </p>
+    </div>
+
+    <div class="api-key-section" style="margin-top:0">
+      <div class="section-label">About</div>
+      <p style="font-size:13px; color:var(--muted); line-height:1.7;">
+        <strong style="color:var(--text)">PlateCheck UK</strong> uses OCR via Tesseract.js to read number plates from your camera, then queries the official DVLA Vehicle Enquiry Service for real-time vehicle data.<br/><br/>
+        Data returned includes: Make, Tax Status, MOT Status, Engine CC, Fuel Type, Colour, CO₂ Emissions, Year of Manufacture, and Euro Status.<br/><br/>
+        <strong style="color:var(--amber)">Note:</strong> BHP is not provided by the DVLA API — engine capacity (cc) is available instead. For BHP you'd need a paid third-party API.
+      </p>
+    </div>
+  </div>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// ========== STATE ==========
+let stream = null;
+let capturedImageData = null;
+let history = JSON.parse(localStorage.getItem('platecheck_history') || '[]');
+let currentTab = 'scan';
+
+// Load saved API key
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('dvla_api_key');
+  if (saved) document.getElementById('apiKeyInput').value = saved;
+  renderHistory();
+});
+
+// ========== TABS ==========
+function switchTab(tab) {
+  currentTab = tab;
+  ['scan','manual','history','settings'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab);
+    document.querySelectorAll('.tab')[['scan','manual','history','settings'].indexOf(t)]
+      .classList.toggle('active', t === tab);
+  });
+  if (tab === 'history') renderHistory();
+}
+
+// ========== CAMERA ==========
+async function toggleCamera() {
+  if (stream) {
+    stopCamera();
+  } else {
+    await startCamera();
+  }
+}
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    const video = document.getElementById('videoEl');
+    video.srcObject = stream;
+    document.getElementById('cameraLive').classList.remove('hidden');
+    document.getElementById('cameraPlaceholder').classList.add('hidden');
+    document.getElementById('btnCamera').innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Stop Camera
+    `;
+    document.getElementById('btnCapture').disabled = false;
+  } catch (e) {
+    showStatus('statusBar', 'Camera access denied. Please allow camera permissions.', 'error');
+  }
+}
+
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+  document.getElementById('cameraLive').classList.add('hidden');
+  document.getElementById('cameraPlaceholder').classList.remove('hidden');
+  document.getElementById('btnCamera').innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    Start Camera
+  `;
+  document.getElementById('btnCapture').disabled = true;
+}
+
+function captureFrame() {
+  const video = document.getElementById('videoEl');
+  const canvas = document.getElementById('captureCanvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  capturedImageData = canvas.toDataURL('image/jpeg', 0.95);
+  showPreview(capturedImageData);
+  stopCamera();
+}
+
+function uploadImage() {
+  document.getElementById('fileInput').click();
+}
+
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    capturedImageData = ev.target.result;
+    showPreview(capturedImageData);
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function showPreview(src) {
+  document.getElementById('previewImg').src = src;
+  document.getElementById('previewSection').classList.remove('hidden');
+  document.getElementById('statusBar').classList.add('hidden');
+  document.getElementById('resultCard').classList.add('hidden');
+}
+
+function discardCapture() {
+  capturedImageData = null;
+  document.getElementById('previewSection').classList.add('hidden');
+  document.getElementById('statusBar').classList.add('hidden');
+  document.getElementById('resultCard').classList.add('hidden');
+  document.getElementById('ocrProgress').classList.add('hidden');
+}
+
+// ========== OCR ==========
+async function runOCR() {
+  if (!capturedImageData) return;
+  document.getElementById('ocrProgress').classList.remove('hidden');
+  document.getElementById('btnOCR').disabled = true;
+  document.getElementById('resultCard').classList.add('hidden');
+  document.getElementById('statusBar').classList.add('hidden');
+
+  try {
+    const result = await Tesseract.recognize(capturedImageData, 'eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          const pct = Math.round((m.progress || 0) * 100);
+          document.getElementById('ocrPct').textContent = pct + '%';
+          document.getElementById('progressFill').style.width = pct + '%';
+          document.getElementById('ocrStatusText').textContent = 'Recognising text...';
+        } else {
+          document.getElementById('ocrStatusText').textContent = m.status;
+        }
+      }
+    });
+
+    document.getElementById('ocrProgress').classList.add('hidden');
+
+    const rawText = result.data.text;
+    const plate = extractPlate(rawText);
+
+    if (plate) {
+      showToast(`Detected: ${plate}`);
+      document.getElementById('previewSection').classList.add('hidden');
+      await lookupPlate(plate, 'statusBar', 'resultCard');
+    } else {
+      showStatus('statusBar', `Could not detect a valid UK plate. Detected text: "${rawText.trim().substring(0, 40)}". Try again or use manual entry.`, 'warning');
+    }
+  } catch (err) {
+    document.getElementById('ocrProgress').classList.add('hidden');
+    showStatus('statusBar', 'OCR failed: ' + err.message, 'error');
+  }
+
+  document.getElementById('btnOCR').disabled = false;
+}
+
+function extractPlate(text) {
+  // Clean up OCR noise
+  const cleaned = text.toUpperCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[^A-Z0-9 ]/g, ' ')
+    .trim();
+
+  // UK plate patterns
+  const patterns = [
+    /\b([A-Z]{2}[0-9]{2}\s?[A-Z]{3})\b/,   // Current: AB12 CDE
+    /\b([A-Z][0-9]{1,3}\s?[A-Z]{3})\b/,     // Suffix: A123 BCD
+    /\b([A-Z]{3}\s?[0-9]{1,3}[A-Z])\b/,     // Prefix: ABC 123D
+    /\b([A-Z]{1,2}[0-9]{1,4})\b/,           // Dateless short
+    /\b([A-Z]{2}[0-9]{2}[A-Z]{3})\b/,       // No space variant
+  ];
+
+  for (const p of patterns) {
+    const m = cleaned.match(p);
+    if (m) return m[1].replace(/\s/g, '');
+  }
+  return null;
+}
+
+// ========== MANUAL LOOKUP ==========
+function lookupManual() {
+  const raw = document.getElementById('manualInput').value.trim().replace(/\s/g, '').toUpperCase();
+  if (!raw) { showToast('Please enter a registration'); return; }
+  lookupPlate(raw, 'statusBarManual', 'resultCardManual');
+}
+
+// ========== DVLA API LOOKUP ==========
+async function lookupPlate(plate, statusId, resultId) {
+  const apiKey = document.getElementById('apiKeyInput').value.trim();
+  if (!apiKey) {
+    showStatus(statusId, '⚠️ No API key set. Go to Settings and add your free DVLA API key.', 'warning');
+    return;
+  }
+
+  showStatus(statusId, `<div class="spinner"></div> Looking up ${plate}...`, 'info');
+  document.getElementById(resultId).classList.add('hidden');
+
+  try {
+    const res = await fetch('https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ registrationNumber: plate })
+    });
+
+    if (res.status === 200) {
+      const data = await res.json();
+      document.getElementById(statusId).classList.add('hidden');
+      renderResult(plate, data, resultId);
+      saveToHistory(plate, data);
+    } else if (res.status === 404) {
+      showStatus(statusId, `No vehicle found for registration <strong>${plate}</strong>. Check the plate is correct.`, 'error');
+    } else if (res.status === 401 || res.status === 403) {
+      showStatus(statusId, 'Invalid API key. Check your key in Settings.', 'error');
+    } else if (res.status === 429) {
+      showStatus(statusId, 'Rate limit reached. Please wait a moment.', 'warning');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showStatus(statusId, `API error ${res.status}: ${err.errors?.[0]?.detail || res.statusText}`, 'error');
+    }
+  } catch (e) {
+    showStatus(statusId, `Network error: ${e.message}. Check your connection.`, 'error');
+  }
+}
+
+// ========== RENDER RESULT ==========
+function renderResult(plate, d, containerId) {
+  const motClass = d.motStatus?.toLowerCase().includes('valid') ? 'valid' :
+                   d.motStatus?.toLowerCase().includes('not valid') ? 'invalid' : 'unknown';
+  const taxClass = d.taxStatus?.toLowerCase() === 'taxed' ? 'valid' :
+                   d.taxStatus?.toLowerCase() === 'untaxed' ? 'invalid' : 'unknown';
+
+  const motLabel = d.motStatus || 'Unknown';
+  const taxLabel = d.taxStatus || 'Unknown';
+  const motExpiry = d.motExpiryDate ? `Expires: ${formatDate(d.motExpiryDate)}` : '';
+  const taxDue = d.taxDueDate ? `Due: ${formatDate(d.taxDueDate)}` : '';
+
+  const html = `
+    <div class="result-header">
+      <div class="result-plate">${plate}</div>
+      <div class="result-make">
+        <div class="result-make-name">${d.make || '—'}</div>
+        <div class="result-year">${d.yearOfManufacture || ''} ${d.colour || ''}</div>
+      </div>
+    </div>
+    <div class="status-badges">
+      <div class="badge ${motClass}">
+        <div class="badge-label">MOT</div>
+        <div class="badge-value">${motClass === 'valid' ? '✓ Valid' : motClass === 'invalid' ? '✗ Invalid' : '? ' + motLabel.substring(0,8)}</div>
+        ${motExpiry ? `<div style="font-size:10px;margin-top:3px;opacity:0.8">${motExpiry}</div>` : ''}
+      </div>
+      <div class="badge ${taxClass}">
+        <div class="badge-label">Road Tax</div>
+        <div class="badge-value">${taxClass === 'valid' ? '✓ Taxed' : taxClass === 'invalid' ? '✗ Untaxed' : taxLabel.substring(0,8)}</div>
+        ${taxDue ? `<div style="font-size:10px;margin-top:3px;opacity:0.8">${taxDue}</div>` : ''}
+      </div>
+      ${d.markedForExport ? `<div class="badge warning"><div class="badge-label">Status</div><div class="badge-value">Export</div></div>` : ''}
+    </div>
+    <div class="detail-grid">
+      ${d.engineCapacity ? `<div class="detail-item"><div class="detail-key">Engine</div><div class="detail-val">${d.engineCapacity} cc</div></div>` : ''}
+      ${d.fuelType ? `<div class="detail-item"><div class="detail-key">Fuel Type</div><div class="detail-val">${d.fuelType}</div></div>` : ''}
+      ${d.co2Emissions ? `<div class="detail-item"><div class="detail-key">CO₂</div><div class="detail-val">${d.co2Emissions} g/km</div></div>` : ''}
+      ${d.euroStatus ? `<div class="detail-item"><div class="detail-key">Euro Status</div><div class="detail-val">${d.euroStatus}</div></div>` : ''}
+      ${d.monthOfFirstRegistration ? `<div class="detail-item"><div class="detail-key">First Reg.</div><div class="detail-val">${d.monthOfFirstRegistration}</div></div>` : ''}
+      ${d.wheelplan ? `<div class="detail-item"><div class="detail-key">Wheelplan</div><div class="detail-val">${d.wheelplan}</div></div>` : ''}
+      ${d.typeApproval ? `<div class="detail-item"><div class="detail-key">Type</div><div class="detail-val">${d.typeApproval}</div></div>` : ''}
+      ${d.revenueWeight ? `<div class="detail-item"><div class="detail-key">Rev. Weight</div><div class="detail-val">${d.revenueWeight} kg</div></div>` : ''}
+    </div>
+  `;
+
+  const el = document.getElementById(containerId);
+  el.innerHTML = html;
+  el.classList.remove('hidden');
+  el.classList.add('result-card');
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ========== HISTORY ==========
+function saveToHistory(plate, data) {
+  const entry = {
+    plate,
+    make: data.make || 'Unknown',
+    colour: data.colour || '',
+    year: data.yearOfManufacture || '',
+    motStatus: data.motStatus || '',
+    taxStatus: data.taxStatus || '',
+    timestamp: Date.now(),
+    data
+  };
+  history = history.filter(h => h.plate !== plate);
+  history.unshift(entry);
+  history = history.slice(0, 50);
+  localStorage.setItem('platecheck_history', JSON.stringify(history));
+}
+
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (history.length === 0) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <p>No lookups yet</p>
+      </div>`;
+    return;
+  }
+  el.innerHTML = `<div class="history-list">${history.map(h => `
+    <div class="history-item" onclick="loadFromHistory('${h.plate}')">
+      <div class="history-plate-mini">${h.plate}</div>
+      <div class="history-info">
+        <div class="history-make">${h.make} ${h.year}</div>
+        <div class="history-meta">${h.colour} · ${new Date(h.timestamp).toLocaleDateString('en-GB')}</div>
+      </div>
+      <div class="history-badge" style="background:${getMotColor(h.motStatus)}22; color:${getMotColor(h.motStatus)}; border:1px solid ${getMotColor(h.motStatus)}44">
+        MOT
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function loadFromHistory(plate) {
+  const entry = history.find(h => h.plate === plate);
+  if (!entry) return;
+  switchTab('manual');
+  document.getElementById('manualInput').value = plate;
+  renderResult(plate, entry.data, 'resultCardManual');
+  document.getElementById('statusBarManual').classList.add('hidden');
+}
+
+function clearHistory() {
+  if (history.length === 0) return;
+  history = [];
+  localStorage.removeItem('platecheck_history');
+  renderHistory();
+  showToast('History cleared');
+}
+
+function getMotColor(status) {
+  if (!status) return '#7070a0';
+  const s = status.toLowerCase();
+  if (s.includes('valid') && !s.includes('not')) return '#22c55e';
+  if (s.includes('not valid')) return '#ef4444';
+  return '#7070a0';
+}
+
+// ========== UTILS ==========
+function showStatus(id, msg, type) {
+  const el = document.getElementById(id);
+  el.className = `status-bar ${type}`;
+  el.innerHTML = msg;
+  el.classList.remove('hidden');
+}
+
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  localStorage.setItem('dvla_api_key', key);
+}
+
+function formatDate(str) {
+  if (!str) return '';
+  const [y, m, d] = str.split('-');
+  return d ? `${d}/${m}/${y}` : `${m}/${y}`;
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
